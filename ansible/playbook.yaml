@@ -1,0 +1,69 @@
+---
+  - name: gcp vm instance
+    hosts: localhost
+    gather_facts: true
+    vars_files:
+      - vars.yaml
+    tasks:
+      - name: create a disk
+        google.cloud.gcp_compute_disk:
+          name: "{{ disk_type }}-{{ disk_size }}gb-disk"
+          size_gb: "{{ disk_size }}"
+          type: "{{ disk_type }}"
+          source_image: "{{ disk_image }}"
+          project: "{{ project_id }}"
+          zone: "{{ zone }}"
+          auth_kind: serviceaccount
+          service_account_file: "{{ service_account_file }}"
+          state: present
+        register: disk
+      - name: create an image
+        google.cloud.gcp_compute_image:
+          name: "centos7-{{ disk_type }}-{{ disk_size }}gb-image"
+          source_disk: "{{ disk }}"
+          project: "{{ project_id }}"
+          auth_kind: serviceaccount
+          service_account_file: "{{ service_account_file }}"
+          state: present
+        register: image
+      - name: create an instance template
+        google.cloud.gcp_compute_instance_template:
+          name: "{{ instance_template_name }}"
+          properties:
+            disks:
+            - auto_delete: 'true'
+              boot: 'true'
+              initialize_params:
+                #disk_size_gb: "{{ disk_size }}"
+                #disk_type: "{{ disk_type }}"
+                #source_image: "{{ disk_image }}"
+                source_image: 'projects/{{ project_id }}/global/images/{{ image.name }}'
+            machine_type: "{{ machine_type }}"
+            metadata:
+              startup-script: |
+                #! /bin/bash
+                sudo yum update -y
+                sudo yum install wget -y
+                sudo wget https://dev.mysql.com/get/mysql80-community-release-el7-3.noarch.rpm
+                sudo rpm -Uvh mysql80-community-release-el7-3.noarch.rpm
+                sudo rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2022
+                sudo yum install -y mysql-server
+            network_interfaces:
+              - network:
+                  selfLink: "projects/{{ project_id }}/global/networks/default"
+          project: "{{ project_id }}"
+          auth_kind: serviceaccount
+          service_account_file: "{{ service_account_file }}"
+          state: present
+        register: instance_template
+      - name: create an instance group
+        google.cloud.gcp_compute_instance_group_manager:
+          name: mysql-server-instance-group
+          base_instance_name: mysql-server
+          instance_template: "{{ instance_template }}"
+          target_size: "{{ number_of_instances }}"
+          project: "{{ project_id }}"
+          zone: "{{ zone }}"
+          auth_kind: serviceaccount
+          service_account_file: "{{ service_account_file }}"
+          state: present

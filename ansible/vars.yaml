@@ -1,0 +1,9 @@
+service_account_file: "ansible-admin-sa.json"
+project_id: "my-project-368815"
+instance_template_name: "mysql-instance"
+machine_type: "c2-standard-8"
+disk_size: "200"
+disk_type: "pd-ssd"
+disk_image: "projects/centos-cloud/global/images/centos-7-v20221102"
+zone: "us-central1-a"
+number_of_instances: 1
